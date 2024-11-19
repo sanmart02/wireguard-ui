@@ -1,27 +1,42 @@
-version: "3"
-
+version: "3.8"
 services:
-  wg:
-    build: .
-    #image: ngoduykhanh/wireguard-ui:latest
-    container_name: wgui
+  wireguard-ui:
+    image: ngoduykhanh/wireguard-ui:latest
+    container_name: wireguard-ui
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
-    network_mode: host
     environment:
-      - SENDGRID_API_KEY
-      - EMAIL_FROM_ADDRESS
-      - EMAIL_FROM_NAME
-      - SESSION_SECRET
-      - WGUI_USERNAME=alpha
-      - WGUI_PASSWORD=this-unusual-password
-      - WG_CONF_TEMPLATE
-      - WGUI_MANAGE_START=false
-      - WGUI_MANAGE_RESTART=false
-    logging:
-      driver: json-file
-      options:
-        max-size: 50m
+      - BASE_PATH=/wireguard
+      - BIND_ADDRESS=0.0.0.0:8080
+      - WGUI_USERNAME=admin
+      - WGUI_PASSWORD=senha_segura
+      - WGUI_SERVER_LISTEN_PORT=51820
     volumes:
-      - ./db:/app/db
+      - ./data:/data
       - /etc/wireguard:/etc/wireguard
+    ports:
+      - "8080:8080"                # Interface Web
+      - "127.0.0.1:51820:51820/udp" # Porta interna WireGuard
+
+  udp2raw:
+    image: wangsirfei/udp2raw
+    container_name: udp2raw
+    restart: unless-stopped
+    command: >
+      -s
+      -l 0.0.0.0:51820
+      -r 127.0.0.1:51820
+      --raw-mode faketcp
+      -k senha_udp2raw
+    ports:
+      - "127.0.0.1:51821:51820"   # Porta TCP interna (para o NGINX)
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"                   # Porta HTTP com Path
